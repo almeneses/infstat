@@ -1,0 +1,18 @@
+{
+    "r.lsp.diagnostics": true,
+    "r.alwaysUseActiveTerminal": true,
+    "r.bracketedPaste": true,
+    "r.sessionWatcher": true,
+    "r.plot.useHttpgd": true,
+
+    "[r]": {
+        "editor.defaultFormatter": "REditorSupport.r",
+        "editor.formatOnSave": true,
+        "editor.wordSeparators": "`~!@#%$^&*()-=+[{]}\\|;:'\",<>/?"
+    },
+    "[rmd]": {
+        "editor.defaultFormatter": "REditorSupport.r",
+        "editor.formatOnSave": true
+    }
+
+}
