@@ -1,31 +1,52 @@
-situacion_1 <- function(n_simulaciones = 1000, n_barcos = 20, k_exitos = 1, prob_especie = 0.25) {
-  prob_estimadas <- numeric(n_simulaciones)
+# Para cada estimador, se calcula: media, sesgo, varianza y ECM
+crear_estimadores <- function(nombre = "", datos_estimador, theta_real) {
+  media <- mean(datos_estimador)
+  varianza <- var(datos_estimador)
+  sesgo <- media - theta_real
+  ecm <- (sesgo^2) + varianza
 
-  for (i in 1:n_simulaciones) {
-    # Generar muestras de los barcos
-    muestra <- rnbinom(n_barcos, size = k_exitos, prob = prob_especie) + k_exitos
-    prob_estimadas[i] <- (k_exitos) / sum(muestra)
-  }
+  return(c(nombre, media, sesgo, varianza, ecm))
+}
 
-  # Rendimientos
-  sesgo <- mean(prob_estimadas) - prob_especie
-  varianza <- var(prob_estimadas)
-  ecm <- sesgo^2 + varianza
+situacion_1 <- function(simulaciones = 1000, n_barcos = 20, k_exitos = 2, prob_especie = 0.25, poblacion_total = 100000) {
+  proporciones <- numeric(simulaciones)
 
-  df <- data.frame(
-    sesgo = sesgo,
-    varianza = varianza,
-    ecm = ecm
+  # Resultados de los 4 estimadores
+  resultados <- data.frame(
+    estimador1 = numeric(simulaciones), # Maxima Verosimilitud
+    estimador2 = numeric(simulaciones), # Media + sd
+    estimador3 = numeric(simulaciones), # Tmax - Tmin + 1
+    estimador4 = numeric(simulaciones) # Media de proporciones
   )
 
-  # Graficar Rendimientos
-  # par(mfrow=c(1,3))
-  # hist(df$sesgo, main="Sesgo", xlab="Sesgo", col="blue")
-  # hist(df$varianza, main="Varianza", xlab="Varianza", col="green")
-  # hist(df$ecm, main="ECM", xlab="ECM", col="red")
-  # par(mfrow=c(1,1))
+  for (i in 1:simulaciones) {
+    # Generar muestras de los barcos
+    fracasos <- rnbinom(n_barcos, size = k_exitos, prob = prob_especie)
+    muestra <- fracasos + k_exitos
+    muestra_ordenada <- sort(muestra)
+    proporciones[i] <- (n_barcos * k_exitos) / sum(fracasos)
 
-  return(df)
+    resultados$estimador1[i] <- (n_barcos * k_exitos) / sum(fracasos)
+    resultados$estimador2[i] <- (k_exitos * (1 - prob_especie)) / prob_especie + sqrt((k_exitos * (1 - prob_especie)) / prob_especie^2)
+    resultados$estimador3[i] <- max(muestra_ordenada) - min(muestra_ordenada) + 1
+    resultados$estimador4[i] <- mean(proporciones)
+  }
+
+  analisis <- data.frame(
+    Estimador = character(4),
+    Media = numeric(4),
+    Sesgo = numeric(4),
+    Varianza = numeric(4),
+    ECM = numeric(4)
+  )
+
+  # Crea tabla de rendimientos
+  analisis[1, ] <- crear_estimadores("EMV", resultados$estimador1, poblacion_total * prob_especie)
+  analisis[2, ] <- crear_estimadores("Media + sd", resultados$estimador2, poblacion_total * prob_especie)
+  analisis[3, ] <- crear_estimadores("Rango", resultados$estimador3, poblacion_total * prob_especie)
+  analisis[4, ] <- crear_estimadores("Proporciones", resultados$estimador4, poblacion_total * prob_especie)
+
+  print(analisis)
 }
 
 
@@ -39,12 +60,11 @@ situacion_2 <- function(simulaciones = 1000, n = 200, media = 5, sd = 2) {
     x2[i] <- mean(muestra[1:n])
   }
 
-  # 4. Visualizar los resultados con un histograma para evidenciar la diferencia en la varianza
   par(mfrow = c(1, 2)) # Esto divide la ventana gráfica en 1 fila y 2 columnas
 
   # Histograma para el primer estimador
   hist(x1,
-    main = "Histograma de Estimador X1 (n=500)",
+    main = paste("Histograma de Estimador X1 ( n =", n, ")"),
     xlab = "Valor Estimado",
     col = "blue",
     freq = FALSE # Muestra la densidad para una mejor comparación
@@ -52,22 +72,12 @@ situacion_2 <- function(simulaciones = 1000, n = 200, media = 5, sd = 2) {
 
   # Histograma para el segundo estimador
   hist(x2,
-    main = "Histograma de Estimador X2 (n=500)",
+    main = paste("Histograma de Estimador X2 ( n =", n, ")"),
     xlab = "Valor Estimado",
     col = "red",
     freq = FALSE
   )
-  return(c(x1, x2))
-}
-
-# Para cada estimador, se calcula: media, sesgo, varianza y ECM
-crear_estimadores <- function(nombre = "", theta, theta_real) {
-  media <- mean(theta)
-  varianza <- var(theta)
-  sesgo <- media - theta_real
-  ecm <- (sesgo^2) + varianza
-
-  return(c(nombre, media, sesgo, varianza, ecm))
+  print(c(x1, x2))
 }
 
 situacion_3 <- function(simulaciones = 1000, theta_real = 50, n_muestra = 5) {
@@ -81,27 +91,24 @@ situacion_3 <- function(simulaciones = 1000, theta_real = 50, n_muestra = 5) {
   )
 
   for (i in 1:simulaciones) {
-    # Genera números enteros de forma aleatoria
-    muestra <- sort(sample(1:theta_real, n_muestra, replace = FALSE))
+    muestra <- sample(1:theta_real, n_muestra, replace = FALSE)
+    muestra_ordenada <- sort(muestra)
 
-    # Calcular estimadores
     # Estimador 1: 2*media - 1
     resultados$estimador1[i] <- 2 * mean(muestra) - 1
 
     # Estimador 2: max + min - 1
-    resultados$estimador2[i] <- max(muestra) + min(muestra) - 1
+    resultados$estimador2[i] <- muestra[length(muestra)] + muestra[1] - 1
 
-    # Estimador 3: max + d_barra
-    # d_barra = media de los saltos
-    saltos <- diff(muestra)
-    d_barra <- mean(saltos)
+    # Estimador 3: max + d_barra -> d_barra = media de los saltos
+    d_barra <- (muestra_ordenada[n_muestra] - muestra_ordenada[1]) / (n_muestra - 1)
     resultados$estimador3[i] <- max(muestra) + d_barra
 
     # Estimador 4: 2*mediana - 1
-    resultados$estimador4[i] <- 2 * median(muestra) - 1
+    resultados$estimador4[i] <- (2 * median(muestra)) - 1
 
     # Estimador 5: media + 3*desviación estándar
-    resultados$estimador5[i] <- mean(muestra) + 3 * sd(muestra)
+    resultados$estimador5[i] <- mean(muestra) + (3 * sd(muestra))
   }
 
   analisis <- data.frame(
@@ -112,7 +119,6 @@ situacion_3 <- function(simulaciones = 1000, theta_real = 50, n_muestra = 5) {
     ECM = numeric(5)
   )
 
-
   # Crea tabla de rendimientos
   analisis[1, ] <- crear_estimadores("Estimador 1", resultados$estimador1, theta_real)
   analisis[2, ] <- crear_estimadores("Estimador 2", resultados$estimador2, theta_real)
@@ -121,4 +127,5 @@ situacion_3 <- function(simulaciones = 1000, theta_real = 50, n_muestra = 5) {
   analisis[5, ] <- crear_estimadores("Estimador 5", resultados$estimador5, theta_real)
 
   print(analisis)
+  print(max(muestra_ordenada) - min(muestra_ordenada))
 }
