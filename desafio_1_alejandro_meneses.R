@@ -8,7 +8,7 @@ crear_estimadores <- function(nombre = "", datos_estimador, theta_real) {
   return(c(nombre, media, sesgo, varianza, ecm))
 }
 
-situacion_1 <- function(simulaciones = 1000, n_barcos = 20, k_exitos = 2, prob_especie = 0.25, poblacion_total = 100000) {
+situacion_1 <- function(simulaciones = 1000, n_barcos = 20, k_exitos = 2, prob_especie = 0.25) {
   proporciones <- numeric(simulaciones)
 
   # Resultados de los 4 estimadores
@@ -16,7 +16,7 @@ situacion_1 <- function(simulaciones = 1000, n_barcos = 20, k_exitos = 2, prob_e
     estimador1 = numeric(simulaciones), # Maxima Verosimilitud
     estimador2 = numeric(simulaciones), # Media + sd
     estimador3 = numeric(simulaciones), # Tmax - Tmin + 1
-    estimador4 = numeric(simulaciones) # Media de proporciones
+    estimador4 = numeric(simulaciones) # k_exitos/mediana(tota_intentos)
   )
 
   for (i in 1:simulaciones) {
@@ -24,12 +24,12 @@ situacion_1 <- function(simulaciones = 1000, n_barcos = 20, k_exitos = 2, prob_e
     fracasos <- rnbinom(n_barcos, size = k_exitos, prob = prob_especie)
     muestra <- fracasos + k_exitos
     muestra_ordenada <- sort(muestra)
-    proporciones[i] <- (n_barcos * k_exitos) / sum(fracasos)
+    proporciones[i] <- (k_exitos) / sum(fracasos)
 
     resultados$estimador1[i] <- (n_barcos * k_exitos) / sum(fracasos)
     resultados$estimador2[i] <- (k_exitos * (1 - prob_especie)) / prob_especie + sqrt((k_exitos * (1 - prob_especie)) / prob_especie^2)
-    resultados$estimador3[i] <- max(muestra_ordenada) - min(muestra_ordenada) + 1
-    resultados$estimador4[i] <- mean(proporciones)
+    resultados$estimador3[i] <- (max(muestra_ordenada) - min(muestra_ordenada) + 1) / sum(fracasos)
+    resultados$estimador4[i] <- k_exitos / median(fracasos + k_exitos)
   }
 
   analisis <- data.frame(
@@ -41,10 +41,10 @@ situacion_1 <- function(simulaciones = 1000, n_barcos = 20, k_exitos = 2, prob_e
   )
 
   # Crea tabla de rendimientos
-  analisis[1, ] <- crear_estimadores("EMV", resultados$estimador1, poblacion_total * prob_especie)
-  analisis[2, ] <- crear_estimadores("Media + sd", resultados$estimador2, poblacion_total * prob_especie)
-  analisis[3, ] <- crear_estimadores("Rango", resultados$estimador3, poblacion_total * prob_especie)
-  analisis[4, ] <- crear_estimadores("Proporciones", resultados$estimador4, poblacion_total * prob_especie)
+  analisis[1, ] <- crear_estimadores("EMV", resultados$estimador1, prob_especie)
+  analisis[2, ] <- crear_estimadores("Media + sd", resultados$estimador2, prob_especie)
+  analisis[3, ] <- crear_estimadores("Rango", resultados$estimador3, prob_especie)
+  analisis[4, ] <- crear_estimadores("Razon Mediana", resultados$estimador4, prob_especie)
 
   print(analisis)
 }
