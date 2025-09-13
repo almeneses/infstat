@@ -107,7 +107,11 @@ for (i in 1:n_mu) {
   potencia_contaminado[i, "Wilcoxon"] <- rejects_wilcox / B
 }
 
-print(potencia_normal)
+
+print(mean(potencia_normal[, "Z-test"]))
+print(mean(potencia_normal[, "t-test"]))
+print(mean(potencia_normal[, "Wilcoxon"]))
+
 
 # -----------------------------------------------------------
 # Análisis y Visualización
