@@ -6,6 +6,7 @@ situacion_2 <- function(n = 40, B = 5000, alpha = 0.05) {
   potencia_contaminado <- matrix(0, nrow = n_mu, ncol = 3, dimnames = list(NULL, c("Z-test", "t-test", "Wilcoxon")))
 
   # Escenario 1: Distribución Normal
+
   for (i in 1:n_mu) {
     mu <- mu_rango[i]
     rejects_z <- 0
@@ -13,10 +14,9 @@ situacion_2 <- function(n = 40, B = 5000, alpha = 0.05) {
     rejects_wilcox <- 0
 
     for (j in 1:B) {
-      # Generar muestra normal
       muestra <- rnorm(n, mean = mu, sd = 0.5)
 
-      # Z-test (asumiendo sigma conocida)
+      # Z-test
       z_statistic <- (mean(muestra) - 10) / (0.5 / sqrt(n))
       p_value_z <- 2 * pnorm(-abs(z_statistic))
       if (p_value_z < alpha) {
@@ -41,11 +41,8 @@ situacion_2 <- function(n = 40, B = 5000, alpha = 0.05) {
     potencia_normal[i, "Wilcoxon"] <- rejects_wilcox / B
   }
 
-  # -----------------------------------------------------------
   # Escenario 2: Distribución Contaminada
-  # -----------------------------------------------------------
 
-  # Función para generar datos del escenario contaminado
   generar_muestra_contaminada <- function(n, mu) {
     # 95% de los datos de una normal "limpia"
     n_limpios <- round(n * 0.95)
