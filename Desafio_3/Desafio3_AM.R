@@ -3,10 +3,7 @@ library(tidyr)
 library(nnet)
 library(tidyverse)
 library(lubridate)
-library(MASS)
-library(glmnet)
 library(speedglm)
-library(broom)
 library(arrow)
 
 set.seed(123)
@@ -14,7 +11,7 @@ set.seed(123)
 # situacion_3_modelo_1, situacion_3_modelo_2 y situacion_3_modelo_3
 # son funciones AUXILIARES de situacion_3
 situacion_3_modelo_1 <- function(df_taxis) {
-  mod1 <- glm(
+  mod_glm <- glm(
     recibio_propina ~ trip_distance + passenger_count + payment_type +
       factor(pickup_hour) + RatecodeID + store_and_fwd_flag,
     family = binomial(link = "logit"),
@@ -23,25 +20,52 @@ situacion_3_modelo_1 <- function(df_taxis) {
 
   print("===========================================")
   print("  Summary Modelo 1")
-  print(summary(mod1))
+  print(summary(mod_glm))
 
   print("===========================================")
   print("  Coeficientes Modelo 1")
-  print(exp(coef(mod1)))
+  print(exp(coef(mod_glm)))
 
   muestra_10pct <- df_taxis %>% slice_sample(prop = 0.10)
+  muestra_50pct <- df_taxis %>% slice_sample(prop = 0.50)
 
-  # Ajustar mod1 en submuestras y comparar coeficientes (ejemplo)
+  print(nrow(df_taxis))
+  print(nrow(muestra_10pct))
+
+  # Ajustar mod_glm en submuestras y comparar coeficientes (ejemplo)
+  mod_muestra_10pct <- glm(
+    recibio_propina ~ trip_distance + passenger_count + payment_type +
+      factor(pickup_hour) + RatecodeID + store_and_fwd_flag,
+    family = binomial(link = "logit"), data = muestra_10pct
+  )
   print("===========================================")
-  print("  Coeficientes Modelo 1 (con muestra de 10%)")
-  summary(glm(recibio_propina ~ trip_distance + passenger_count + payment_type, family = binomial, data = muestra_10pct))
+  print("  Summary Modelo 1 (con muestra de 10%)")
+  print(summary(mod_muestra_10pct))
 
-  # # Alternativa: usar speedglm para datasets grandes (mismo modelo)
-  # mod1_fast <- speedglm(
-  #   recibio_propina ~ trip_distance + passenger_count + payment_type +
-  #     factor(pickup_hour) + RatecodeID + store_and_fwd_flag,
-  #   family = binomial(link = "logit"), data = df_taxis
-  # )
+  mod_muestra_50pct <- glm(
+    recibio_propina ~ trip_distance + passenger_count + payment_type +
+      factor(pickup_hour) + RatecodeID + store_and_fwd_flag,
+    family = binomial(link = "logit"), data = muestra_10pct
+  )
+  print("===========================================")
+  print("  Summary Modelo 1 (con muestra de 50%)")
+  print(summary(mod_muestra_50pct))
+
+  # Alternativa: usar speedglm para datasets grandes (mismo modelo)
+  mod_speedglm <- speedglm(
+    recibio_propina ~ trip_distance + passenger_count + payment_type +
+      factor(pickup_hour) + RatecodeID + store_and_fwd_flag,
+    family = binomial(link = "logit"), data = df_taxis
+  )
+
+  print("===========================================")
+  print("  Summary Modelo 1 (con speedglm)")
+  print(summary(mod_speedglm))
+
+
+  print("===========================================")
+  print("  Comparación (10% vs 50% vs speedglm) utilizando el criterio Akaike (AIC)")
+  print(AIC(mod_muestra_10pct, mod_muestra_50pct, mod_speedglm))
 }
 
 situacion_3_modelo_2 <- function(df_taxis) {
@@ -66,7 +90,7 @@ situacion_3_modelo_2 <- function(df_taxis) {
   mean_pc <- mean(df_taxis$passenger_count, na.rm = TRUE)
   var_pc <- var(df_taxis$passenger_count, na.rm = TRUE)
   dispersion_ratio <- var_pc / mean_pc
-  cat("Mean:", mean_pc, "Var:", var_pc, "Dispersion ratio:", dispersion_ratio, "\n")
+  cat("Media:", mean_pc, "Var:", var_pc, "Dispersion:", dispersion_ratio, "\n")
 
   print("===========================================")
   print(" Coeficientes Modelo 2")
@@ -74,15 +98,16 @@ situacion_3_modelo_2 <- function(df_taxis) {
 }
 
 situacion_3_modelo_3 <- function(df_taxis) {
-  df_tips <- (na.omit(df_taxis)) %>% filter(tip_amount > 0)
+  df_tips <- na.omit(df_taxis %>% filter(tip_amount > 0))
   df_tips <- df_tips %>% slice_sample(prop = 0.20)
-  df_tips$store_and_fwd_flag <- as.factor(df_tips$store_and_fwd_flag)
-  # GLM Gamma con enlace log
+
+  # GLM Gamma
   print("===========================================")
   print(" Calcular Modelo 3")
   mod3_gamma <- speedglm(tip_amount ~ trip_distance + passenger_count + payment_type + factor(pickup_hour),
     family = Gamma(link = "log"),
-    data = df_tips
+    data = df_tips,
+    maxit = 150
   )
   print("===========================================")
   print(" Summary Modelo 3")
@@ -94,29 +119,14 @@ situacion_3_modelo_3 <- function(df_taxis) {
   print(exp(confint(mod3_gamma)))
 
   # Alternativa: probar link inverse
-  # print("===========================================")
-  # print(" Modelo 3 - Alternativa (inverse)")
-  # mod3_gamma_inv <- glm(tip_amount ~ trip_distance + passenger_count + payment_type + factor(pickup_hour),
-  #   family = Gamma(link = "inverse"), data = df_tips
-  # )
-
-  # print("===========================================")
-  # print(" Coeficientes Modelo 3 - Alternativa (inverse)")
-  # print(exp(coef(mod3_gamma_inv)))
-  # print(exp(confint(mod3_gamma_inv)))
-
-  # print("===========================================")
-  # print(" AIC Gamma vs. Inverse")
-  # print(AIC(mod3_gamma, mod3_gamma_inv))
-
-  df_tips %>%
-    mutate(dist_bin = ntile(trip_distance, 10)) %>%
-    group_by(dist_bin) %>%
-    summarize(prob_tip = mean(recibio_propina), mean_dist = mean(trip_distance)) %>%
-    ggplot(aes(x = mean_dist, y = prob_tip)) +
-    geom_point() +
-    geom_smooth(method = "loess") +
-    labs(x = "Distancia (millas)", y = "Probabilidad de propina")
+  print("===========================================")
+  print(" Modelo 3 - Alternativa (inverse) - (Saldrá error, No converge)")
+  mod3_gamma_inv <- speedglm(tip_amount ~ trip_distance + passenger_count + payment_type + factor(pickup_hour),
+    family = Gamma(link = "inverse"),
+    data = df_tips,
+    maxit = 150
+  )
+  mod3_gamma_inv
 }
 
 situacion_2 <- function() {
@@ -176,7 +186,7 @@ situacion_2 <- function() {
 }
 
 situacion_3 <- function(modelo = "modelo1") {
-  df_taxis <- read_parquet("Desafio_3/taxis_enero_2023.parquet")
+  df_taxis <- read_parquet("taxis_enero_2023.parquet")
 
   # Limpieza y variables derivadas
   # Convertir datetimes
